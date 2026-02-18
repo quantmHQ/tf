@@ -1,0 +1,3 @@
+module "valid" {
+  source = "../../valid"
+}
