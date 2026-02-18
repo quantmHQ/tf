@@ -11,6 +11,10 @@ This Terraform module creates a Virtual Private Cloud (VPC) network and related 
 *   Sets up basic firewall rules to allow egress traffic to the internet and ingress traffic for ICMP, SSH (port 22), HTTP (port 80), and HTTPS (port 443).
 *   Supports IPv6
 
+## Baseline Permissions
+
+Our `permissions` module is the baseline for all modules and forms the basis of the Principle of Least Privilege (PoLP) to build secure modules.
+
 ## Prerequisites
 
 *   Terraform installed (version >= 1.0).

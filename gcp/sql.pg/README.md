@@ -15,6 +15,10 @@ It facilitates the provisioning of:
 *   A specific database within the instance.
 *   A database user with a randomly generated secure password.
 
+## Baseline Permissions
+
+Our `permissions` module is the baseline for all modules and forms the basis of the Principle of Least Privilege (PoLP) to build secure modules.
+
 ## Usage Example
 
 ```hcl
