@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/oauth2"
@@ -74,13 +75,15 @@ func (c Config) repositoryBase() string {
 	return fmt.Sprintf("%s/%s/%s", c.registryHost(), c.project, c.repo)
 }
 
-func shorthash() string {
+func tag() string {
 	out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
 	if err != nil {
 		log.Fatalf("failed to get git short hash: %v", err)
 	}
 
-	return strings.TrimSpace(string(out))
+	now := time.Now().UTC()
+
+	return fmt.Sprintf("%s-%s", now.Format("20060102"), strings.TrimSpace(string(out)))
 }
 
 func newAuthClient(ctx context.Context) (*auth.Client, error) {
@@ -132,7 +135,11 @@ func push(ctx context.Context, cfg Config, mod modules.Module, zipData *bytes.Bu
 		return fmt.Errorf("pack manifest: %w", err)
 	}
 
-	_, err = oras.Copy(ctx, store, manifest.Digest.String(), repo, tag, oras.CopyOptions{})
+	if err := store.Tag(ctx, manifest, tag); err != nil {
+		return fmt.Errorf("tag manifest: %w", err)
+	}
+
+	_, err = oras.Copy(ctx, store, tag, repo, tag, oras.CopyOptions{})
 	if err != nil {
 		return fmt.Errorf("push to registry: %w", err)
 	}
@@ -142,7 +149,7 @@ func push(ctx context.Context, cfg Config, mod modules.Module, zipData *bytes.Bu
 
 func run(ctx context.Context, dryrun bool) error {
 	cfg := loadConfig()
-	tag := shorthash()
+	tag := tag()
 
 	slog.Info("publishing", "tag", tag, "registry", cfg.repositoryBase())
 
