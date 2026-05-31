@@ -1,10 +1,31 @@
+// Publish is a CLI tool that packages OpenTofu modules as OCI artifacts
+// and pushes them to a Google Cloud Artifact Registry.
+//
+// Modules are discovered under aws/ and gcp/ subdirectories. Each module
+// is zipped in-memory, wrapped in an OCI manifest with artifact type
+// application/vnd.opentofu.modulepkg, and tagged with the current git short hash.
+//
+// Authentication uses Google Application Default Credentials.
+//
+// Usage:
+//
+//	go run ./cmd/publish     # publish all modules
+//	go run ./cmd/publish -d  # dry run: discover only
+//
+// Environment variables:
+//
+//	PROJECT_ID     - GCP project ID (required)
+//	REGION         - Artifact Registry region (required)
+//	REGISTRY_NAME  - Artifact Registry repository name (required)
 package main
 
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -22,17 +43,17 @@ import (
 
 type (
 	Config struct {
-		projectID    string
-		region       string
-		registryName string
+		project string
+		region  string
+		repo    string
 	}
 )
 
 func loadConfig() Config {
 	return Config{
-		projectID:    envordie("PROJECT_ID"),
-		region:       envordie("REGION"),
-		registryName: envordie("REGISTRY_NAME"),
+		project: envordie("PROJECT_ID"),
+		region:  envordie("REGION"),
+		repo:    envordie("REPO"),
 	}
 }
 
@@ -50,7 +71,7 @@ func (c Config) registryHost() string {
 }
 
 func (c Config) repositoryBase() string {
-	return fmt.Sprintf("%s/%s/%s", c.registryHost(), c.projectID, c.registryName)
+	return fmt.Sprintf("%s/%s/%s", c.registryHost(), c.project, c.repo)
 }
 
 func shorthash() string {
@@ -119,9 +140,11 @@ func push(ctx context.Context, cfg Config, mod modules.Module, zipData *bytes.Bu
 	return nil
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, dryrun bool) error {
 	cfg := loadConfig()
 	tag := shorthash()
+
+	slog.Info("publishing", "tag", tag, "registry", cfg.repositoryBase())
 
 	root, err := os.Getwd()
 	if err != nil {
@@ -137,7 +160,11 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("no modules found")
 	}
 
-	fmt.Printf("discovered %d modules\n", len(mods))
+	slog.Info("discovered modules", "count", len(mods))
+
+	if dryrun {
+		return nil
+	}
 
 	authClient, err := newAuthClient(ctx)
 	if err != nil {
@@ -149,37 +176,42 @@ func run(ctx context.Context) error {
 	for _, mod := range mods {
 		zipBuf, fileCount, err := mod.Archive()
 		if err != nil {
-			fmt.Printf("  x %s/%s: zip failed: %v\n", mod.Cloud, mod.Name, err)
+			slog.Error("archive failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
 
 			failed++
 
 			continue
 		}
+
+		slog.Info("archived", "cloud", mod.Cloud, "name", mod.Name, "files", fileCount, "size_kb", float64(zipBuf.Len())/1024)
 
 		if err := push(ctx, cfg, mod, zipBuf, tag, authClient); err != nil {
-			fmt.Printf("  x %s/%s: push failed: %v\n", mod.Cloud, mod.Name, err)
+			slog.Error("push failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
 
 			failed++
 
 			continue
 		}
 
-		fmt.Printf("  ok %s/%s (%d files, %.1f KB) -> :%s\n",
-			mod.Cloud, mod.Name, fileCount, float64(zipBuf.Len())/1024, tag)
+		slog.Info("pushed", "cloud", mod.Cloud, "name", mod.Name, "tag", tag)
 	}
-
-	fmt.Printf("\npublished %d/%d modules as :%s\n", len(mods)-failed, len(mods), tag)
 
 	if failed > 0 {
-		return fmt.Errorf("%d modules failed", failed)
+		return fmt.Errorf("%d/%d modules failed", failed, len(mods))
 	}
+
+	slog.Info("published all modules", "count", len(mods), "tag", tag)
 
 	return nil
 }
 
 func main() {
+	dryrun := flag.Bool("d", false, "dry run: list discovered modules without pushing")
+
+	flag.Parse()
+
 	ctx := context.Background()
-	if err := run(ctx); err != nil {
+	if err := run(ctx, *dryrun); err != nil {
 		log.Fatal(err)
 	}
 }

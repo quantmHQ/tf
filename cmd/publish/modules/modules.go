@@ -1,22 +1,34 @@
+// Package modules discovers and archives OpenTofu/OCI module directories.
+//
+// A module is any directory containing files with .tf or .tofu extensions.
+// Modules are organized under cloud-provider subdirectories (e.g., aws/, gcp/).
 package modules
 
 import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+// Module represents a discovered infrastructure module directory.
 type (
 	Module struct {
+		// Cloud is the cloud provider subdirectory (e.g., "aws", "gcp").
 		Cloud string
-		Name  string
-		Path  string
+		// Name is the directory name of the module.
+		Name string
+		// Path is the absolute filesystem path to the module directory.
+		Path string
 	}
 )
 
+// Archive creates an in-memory zip of the module directory contents.
+// It returns the zip buffer, the number of files archived, or an error.
+// Dotfiles and .terraform directories are excluded.
 func (m Module) Archive() (*bytes.Buffer, int, error) {
 	buf := &bytes.Buffer{}
 	w := zip.NewWriter(buf)
@@ -70,6 +82,9 @@ func (m Module) Archive() (*bytes.Buffer, int, error) {
 	return buf, count, nil
 }
 
+// Discover scans the root directory for cloud-provider subdirectories (aws/, gcp/)
+// and collects all module directories containing .tf or .tofu files.
+// Each discovered module is logged via slog.Info.
 func Discover(root string) ([]Module, error) {
 	var result []Module
 
@@ -87,7 +102,7 @@ func Discover(root string) ([]Module, error) {
 			}
 
 			modPath := filepath.Join(dir, entry.Name())
-			if !hasTerraformFiles(modPath) {
+			if !hastf(modPath) {
 				continue
 			}
 
@@ -96,13 +111,16 @@ func Discover(root string) ([]Module, error) {
 				Name:  entry.Name(),
 				Path:  modPath,
 			})
+
+			slog.Info("discovered module", "cloud", cloud, "name", entry.Name())
 		}
 	}
 
 	return result, nil
 }
 
-func hasTerraformFiles(dir string) bool {
+// hastf reports whether a directory contains .tf or .tofu files.
+func hastf(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
