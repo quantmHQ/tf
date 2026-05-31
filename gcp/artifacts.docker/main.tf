@@ -9,13 +9,6 @@ resource "google_artifact_registry_repository" "default" {
     name        = var.name
     environment = var.environment
   }
-
-  lifecycle {
-    precondition {
-      condition     = contains(module.valid.multi_regions, var.location)
-      error_message = "Not a valid region"
-    }
-  }
 }
 
 # --- IAM Binding for Read-Only Service Accounts ---

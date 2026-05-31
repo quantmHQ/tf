@@ -32,13 +32,6 @@ resource "google_storage_bucket" "default" {
     }
   }
 
-  lifecycle {
-    precondition {
-      condition     = contains(concat(module.valid.regions, module.valid.multi_regions), var.location)
-      error_message = "not a valid region for the bucket"
-    }
-  }
-
   force_destroy = var.force_destroy
 }
 

@@ -1,3 +1,0 @@
-module "valid" {
-  source = "../../valid"
-}

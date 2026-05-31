@@ -40,14 +40,6 @@ resource "google_compute_subnetwork" "default" {
   }
 
   depends_on = [google_compute_network.default]
-
-  lifecycle {
-    precondition {
-      # Check region validity for each subnet instance using data from the 'valid' module
-      condition     = contains(module.valid.regions, each.value.region)
-      error_message = "Subnet '${each.key}' uses region '${each.value.region}', which is not in the allowed."
-    }
-  }
 }
 
 ################################################################################

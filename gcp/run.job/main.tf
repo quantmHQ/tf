@@ -76,11 +76,6 @@ resource "google_cloud_run_v2_job" "default" {
   }
 
   lifecycle {
-    precondition {
-      condition     = contains(module.valid.regions, var.region)
-      error_message = "Region '${var.region}' is not allowed."
-    }
-
     ignore_changes = [
       client,
       client_version,
