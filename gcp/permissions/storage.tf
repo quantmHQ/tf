@@ -20,11 +20,17 @@ locals {
     ]
     w = [
       "storage.objects.create",
+      "storage.objects.createContext",
       "storage.objects.delete",
-      "storage.objects.update",
-      "storage.objects.copy",
-      "storage.objects.rewrite",
+      "storage.objects.deleteContext",
+      "storage.objects.list",
+      "storage.objects.move",
+      "storage.objects.overrideUnlockedRetention",
       "storage.objects.restore",
+      "storage.objects.setIamPolicy",
+      "storage.objects.setRetention",
+      "storage.objects.update",
+      "storage.objects.updateContext",
       "storage.multipartUploads.create",
       "storage.multipartUploads.abort",
     ]
