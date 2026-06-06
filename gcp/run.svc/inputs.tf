@@ -164,6 +164,11 @@ variable "sidecars" {
       name = string
       tag  = string
     }))
+
+    resources = optional(object({
+      cpu    = optional(string)
+      memory = optional(string)
+    }))
   }))
   default = {}
 }

@@ -100,7 +100,16 @@ resource "google_cloud_run_v2_service" "default" {
 
       content {
         name  = containers.key
-        image = local.image
+        image = containers.value.image != null ? "${containers.value.image.url}/${containers.value.image.name}:${containers.value.image.tag}" : local.image
+
+
+        resources {
+          limits = {
+            cpu    = containers.value.resources != null ? containers.value.resources.cpu : "500m"
+            memory = containers.value.resources != null ? containers.value.resources.memory : "256Mi"
+          }
+        }
+
 
         dynamic "env" {
           for_each = merge(
