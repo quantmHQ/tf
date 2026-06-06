@@ -113,6 +113,14 @@ resource "google_cloud_run_v2_service" "default" {
           }
         }
 
+        dynamic "volume_mounts" {
+          for_each = var.gcs_volumes
+          content {
+            name       = volume_mounts.key
+            mount_path = volume_mounts.value.path
+          }
+        }
+
         command = containers.value.command
       }
     }
