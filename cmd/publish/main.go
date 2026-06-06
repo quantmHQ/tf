@@ -29,11 +29,13 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/sync/errgroup"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/memory"
 	"oras.land/oras-go/v2/registry/remote"
@@ -178,33 +180,41 @@ func run(ctx context.Context, dryrun bool) error {
 		return err
 	}
 
-	var failed int
+	g, ctx := errgroup.WithContext(ctx)
+
+	var failed atomic.Int64
 
 	for _, mod := range mods {
-		zipBuf, fileCount, err := mod.Archive()
-		if err != nil {
-			slog.Error("archive failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
+		g.Go(func() error {
+			zipBuf, fileCount, err := mod.Archive()
+			if err != nil {
+				slog.Error("archive failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
+				failed.Add(1)
 
-			failed++
+				return nil
+			}
 
-			continue
-		}
+			slog.Info("archived", "cloud", mod.Cloud, "name", mod.Name, "files", fileCount, "size_kb", float64(zipBuf.Len())/1024)
 
-		slog.Info("archived", "cloud", mod.Cloud, "name", mod.Name, "files", fileCount, "size_kb", float64(zipBuf.Len())/1024)
+			if err := push(ctx, cfg, mod, zipBuf, tag, authClient); err != nil {
+				slog.Error("push failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
+				failed.Add(1)
 
-		if err := push(ctx, cfg, mod, zipBuf, tag, authClient); err != nil {
-			slog.Error("push failed", "cloud", mod.Cloud, "name", mod.Name, "error", err)
+				return nil
+			}
 
-			failed++
+			slog.Info("pushed", "cloud", mod.Cloud, "name", mod.Name, "tag", tag)
 
-			continue
-		}
-
-		slog.Info("pushed", "cloud", mod.Cloud, "name", mod.Name, "tag", tag)
+			return nil
+		})
 	}
 
-	if failed > 0 {
-		return fmt.Errorf("%d/%d modules failed", failed, len(mods))
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	if n := int(failed.Load()); n > 0 {
+		return fmt.Errorf("%d/%d modules failed", n, len(mods))
 	}
 
 	slog.Info("published all modules", "count", len(mods), "tag", tag)
