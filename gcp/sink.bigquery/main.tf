@@ -22,8 +22,24 @@ resource "google_logging_project_sink" "default" {
 
 # The sink cannot write anywhere until its (GCP-generated) writer identity is
 # granted write access to the destination dataset.
-resource "google_bigquery_dataset_iam_member" "writer" {
+resource "google_bigquery_dataset_iam_binding" "writers" {
   dataset_id = var.dataset
   role       = "roles/bigquery.dataEditor"
-  member     = google_logging_project_sink.default.writer_identity
+
+  members = concat(
+    [google_logging_project_sink.default.writer_identity],
+    [for email in var.service_account_rw : "serviceAccount:${email}"]
+  )
+}
+
+# --- IAM Binding for Read-Only Service Accounts ---
+resource "google_bigquery_dataset_iam_binding" "readers" {
+  count = length(var.service_account_r) > 0 ? 1 : 0
+
+  dataset_id = var.dataset
+  role       = "roles/bigquery.dataViewer"
+
+  members = [
+    for email in var.service_account_r : "serviceAccount:${email}"
+  ]
 }

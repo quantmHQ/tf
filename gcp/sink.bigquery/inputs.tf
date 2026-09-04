@@ -13,6 +13,18 @@ variable "dataset" {
   description = "The ID of the destination BigQuery dataset the sink routes logs into."
 }
 
+variable "service_account_r" {
+  type        = list(string)
+  default     = []
+  description = "A list of email addresses of service accounts that need read-only access to the routed logs in the destination dataset."
+}
+
+variable "service_account_rw" {
+  type        = list(string)
+  default     = []
+  description = "A list of email addresses of service accounts that need read-write access to the routed logs in the destination dataset."
+}
+
 variable "resources" {
   type = list(object({
     type  = string # resource.type, e.g. "cloud_run_revision"
