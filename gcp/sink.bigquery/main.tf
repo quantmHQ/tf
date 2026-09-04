@@ -25,6 +25,7 @@ resource "google_logging_project_sink" "default" {
 resource "google_bigquery_dataset_iam_binding" "writers" {
   dataset_id = var.dataset
   role       = "roles/bigquery.dataEditor"
+  project = var.project
 
   members = concat(
     [google_logging_project_sink.default.writer_identity],
@@ -38,6 +39,7 @@ resource "google_bigquery_dataset_iam_binding" "readers" {
 
   dataset_id = var.dataset
   role       = "roles/bigquery.dataViewer"
+  project    = var.project
 
   members = [
     for email in var.service_account_r : "serviceAccount:${email}"
