@@ -46,9 +46,9 @@ resource "google_cloud_run_v2_service" "default" {
 
       startup_probe {
         initial_delay_seconds = 0
-        timeout_seconds       = 10
-        period_seconds        = 15
-        failure_threshold     = 3
+        timeout_seconds       = 2
+        period_seconds        = 2
+        failure_threshold     = 15
 
         http_get {
           path = var.healthz
