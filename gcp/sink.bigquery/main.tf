@@ -18,6 +18,10 @@ resource "google_logging_project_sink" "default" {
   destination            = "bigquery.googleapis.com/projects/${var.project}/datasets/${var.dataset}"
   filter                 = local.filter
   unique_writer_identity = true
+
+  bigquery_options {
+    use_partitioned_tables = true
+  }
 }
 
 # The sink cannot write anywhere until its (GCP-generated) writer identity is
